@@ -1,0 +1,54 @@
+{
+    "eyes":
+    [
+        {
+            "id": 0,
+            "Name": "EYES_UP_DOWN", 
+            "min": 30,
+            "mid": 90,
+            "max": 160 
+        
+        },
+        {
+            "id": 1,
+            "Name": "EYES_LEFT_RIGHT", 
+            "min": 30,
+            "mid": 85,
+            "max": 160 
+        
+        },
+        {
+            "id": 2,
+            "Name": "RIGHT_EYE_UPPER_LID", 
+            "min": 50,
+            "mid": 90,
+            "max": 160 
+        
+        },
+        {
+            "id": 3,
+            "Name": "RIGHT_EYE_LOWER_LID", 
+            "min": 50,
+            "mid": 90,
+            "max": 140 
+        
+        },
+        {
+            "id": 4,
+            "Name": "LEFT_EYE_UPPER_LID", 
+            "min": 30,
+            "mid": 90,
+            "max": 140 
+        
+        },
+        {
+            "id": 5,
+            "Name": "LEFT_EYE_LOWER_LID", 
+            "min": 40,
+            "mid": 90,
+            "max": 130 
+        
+        }
+        
+    ]
+}
