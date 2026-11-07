@@ -81,7 +81,7 @@ class EyeDriver():
         self.kit.servo[self.LEFT_EYE_UPPER_LID].angle = self.json_data["eyes"][self.LEFT_EYE_UPPER_LID]["max"]
         self.kit.servo[self.LEFT_EYE_LOWER_LID].angle = self.json_data["eyes"][self.LEFT_EYE_LOWER_LID]["min"]
 
-        time.sleep(1)
+        time.sleep(0.1)
         # open eyes
         self.kit.servo[self.RIGHT_EYE_UPPER_LID].angle = self.json_data["eyes"][self.RIGHT_EYE_UPPER_LID]["mid"]
         self.kit.servo[self.RIGHT_EYE_LOWER_LID].angle = self.json_data["eyes"][self.RIGHT_EYE_LOWER_LID]["mid"]

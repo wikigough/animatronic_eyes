@@ -17,21 +17,18 @@ or
 sudo i2cdetect -y 1
 ```
 
-## Configure servokit library
+## Configure libraries
+First create the virtual environment. Use `--system-site-packages` so you can use `picamera2`.
+```bash
+python3 -m venv --system-site-packages .venv
 ```
-python3 -m venv .venv
+Activate the venv:
+```bash
 source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install adafruit-circuitpython-servokit
-
-python main.py
-
-deactivate
 ```
-
-## Configure INA228 library
-```
-pip install adafruit-circuitpython-ina228 
+Install additional libraries (`adafruit_ina228` and `adafruit_servokit`):
+```bash
+pip install -r requirements.txt
 ```
 
 ## Deploying onto RPi
@@ -43,13 +40,15 @@ For an actual copy:
 ```bash
 ./deploy.sh vicky eyepi.local /home/vicky/projects/eyes
 ```
+Sometimes you need to replace eyepi.local with an IP address. 
 
-To run script on the pi, navigate to eyes folder.
-then:
-```bash
-source .venv/bin/activate
+To get an IP address, open powershell:
+```powershell
+Resolve-DnsName eyepi.local
 ```
 
+## Grabbing images off the RPi
 ```bash
-python servo/servo.py
+./grab_images.sh vicky eyepi.local /home/vicky/projects/eyes
 ```
+## Running

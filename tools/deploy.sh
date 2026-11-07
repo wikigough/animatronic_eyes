@@ -133,7 +133,8 @@ rsync \
   --exclude='.env' \
   --exclude='.vscode/' \
   --exclude='/tools/deploy.sh' \
-  --exclude='/tools/deploy_old.sh' \
+  --exclude='/tools/grab_images.sh' \
+  --exclude='images/' \
   --rsync-path="mkdir -p '${remote_dir}' && rsync" \
   "${project_dir}/" \
   "${pi_user}@${pi_host}:${remote_dir}/"
