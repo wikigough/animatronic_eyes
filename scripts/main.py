@@ -6,6 +6,7 @@ import pickle
 from eye_driver import EyeDriver
 from pathlib import Path
 import time
+import math
 
 from picamera2 import Picamera2
 
@@ -23,17 +24,25 @@ class EyeMech():
 
         # init camera
         self.picam2 = Picamera2()
-        self.picam2.configure(self.picam2.create_preview_configuration(main={"format": 'XRGB8888', "size": (1920, 1080)}))
+        self.raw_frame_width = 1920 # orig = 1920
+        self.raw_frame_height = 1080 # orig = 1080
+        self.picam2.configure(self.picam2.create_preview_configuration(main={"format": 'XRGB8888', "size": (self.raw_frame_width, self.raw_frame_height)}))
         self.picam2.start()
 
         # initialise variables
-        self.cv_scaler = 4
+        self.cv_scaler = 2
+        self.face_location_x_max = int(self.raw_frame_width / self.cv_scaler)
+        self.face_location_y_max = int(self.raw_frame_height / self.cv_scaler)
         self.face_locations = []
         self.face_encodings = []
         self.face_names = []
         self.frame_count = 0
         self.start_time = time.time()
         self.fps = 0
+        self.fov = math.pi * 120/180
+
+        # init eyedriver
+        self.eye_driver = EyeDriver()
 
     def _process_frame(self, frame):
         # Resize the frame using cv_scaler to increase performance (less pixels processed, less time spent)
@@ -41,9 +50,9 @@ class EyeMech():
         
         # Convert the image from BGR to RGB colour space, the facial recognition library uses RGB, OpenCV uses BGR
         rgb_resized_frame = cv2.cvtColor(resized_frame, cv2.COLOR_BGR2RGB)
-        
+
         # Find all the faces and face encodings in the current frame of video
-        self.face_locations = face_recognition.face_locations(rgb_resized_frame)
+        self.face_locations = face_recognition.face_locations(rgb_resized_frame, number_of_times_to_upsample=0, model="hog")
         #self.face_encodings = face_recognition.face_encodings(rgb_resized_frame, self.face_locations, model='small')
         
         self.face_names = []
@@ -62,6 +71,89 @@ class EyeMech():
 
         """
         return frame
+
+    def _get_centres(self):
+        # top left origin in frame.
+        # (top, right, bottom, left)
+        # 
+        # (0,0)
+        # 
+        # +------------------------------+  → x
+        # |   +---top----+               |
+        # |   |          |               |
+        # |  left        right           |
+        # |   |          |               |
+        # |   +--bottom--+               |
+        # |                              |
+        # +------------------------------+
+        # 
+        # ↓ y
+
+        centres = []
+        for face_location in self.face_locations:
+            x = (face_location[1] - face_location[3])/2 + face_location[3]
+            y = (face_location[2] - face_location[0])/2 + face_location[0]
+            centres.append((x*self.cv_scaler, y*self.cv_scaler))
+
+        return centres
+    
+    def _get_face_sizes(self):
+        # top left origin in frame.
+        # (top, right, bottom, left)
+        # 
+        # (0,0)
+        # 
+        # +------------------------------+  → x
+        # |   +---top----+               |
+        # |   |          |               |
+        # |  left        right           |
+        # |   |          |               |
+        # |   +--bottom--+               |
+        # |                              |
+        # +------------------------------+
+        # 
+        # ↓ y
+
+        face_sizes = []
+        for face_location in self.face_locations:
+            x_size = (face_location[1] - face_location[3])*self.cv_scaler
+            y_size = (face_location[2] - face_location[0])*self.cv_scaler
+            face_sizes.append(x_size * y_size)
+
+        return face_sizes
+
+    def _get_spherical_coords(self, centres, face_sizes):
+        """
+            See notes for derivation
+        """
+        sph_coords = []
+        for i in range(0, len(self.face_locations)):
+            x_c, y_c = centres[i] # pixel location 
+
+            # depth
+            face_area_pixels = face_sizes[i] # pixels^2
+            face_area_cm2 = 300 # rough face bounding box area in cm2
+            fx = self.raw_frame_width / (2 * math.tan(self.fov / 2))
+            depth = fx * math.sqrt(face_area_cm2 / face_area_pixels)
+
+            # r
+            fy = fx # square pixels
+            nx = (x_c - self.raw_frame_width / 2) / fx # normalised
+            ny = (y_c - self.raw_frame_height / 2) / fy # normalised
+            x_cm = depth * nx
+            y_cm = depth * ny
+            r = math.sqrt(depth*depth + x_cm*x_cm + y_cm*y_cm)
+
+            # theta
+            theta = math.degrees(math.atan2(x_cm, depth))
+
+            # phi
+            phi = math.degrees(math.atan2(-y_cm, math.hypot(x_cm, depth)))
+
+            sph_coords.append( (r, theta, phi) )
+
+        return sph_coords
+
 
     def _draw_results(self, frame):
         # Display the results
@@ -82,6 +174,9 @@ class EyeMech():
         
         return frame
 
+    def _get_radial_coordinates(self, face_centre):
+        pass
+
     def _calculate_fps(self):
         self.frame_count += 1
         elapsed_time = time.time() - self.start_time
@@ -91,19 +186,50 @@ class EyeMech():
             self.start_time = time.time()
         return self.fps
 
+
     def run(self):
         try:
             while True:
+                t0 = time.perf_counter()
+
                 frame = self.picam2.capture_array()
 
+                t1 = time.perf_counter()
                 processed_frame = self._process_frame(frame)
-                print(self.face_locations)
-                #print(self.face_encodings)
-                #print(self.face_names)
+                # print(self.face_locations)
+                # print(self.face_encodings)
+                # print(self.face_names)
+                t2 = time.perf_counter()
+
+                centres = self._get_centres()
+                face_sizes = self._get_face_sizes()
+                # print(centres, face_sizes)
+                sph_coords = self._get_spherical_coords(centres, face_sizes)
+
+                t3 = time.perf_counter()
 
                 # Calculate and update FPS
                 current_fps = self._calculate_fps()
                 print(current_fps)
+
+                t4 = time.perf_counter()
+
+                # move eyes left and right only for now
+                if sph_coords:
+                    r, theta, phi = sph_coords[0]
+                    self.eye_driver.move_eyes_left_right(180 - (theta + 90) )
+                    curr_up_down_angle = self.eye_driver.get_current_angles()[EyeDriver.EYES_UP_DOWN]
+                    self.eye_driver.move_eyes_up_down(curr_up_down_angle + phi)
+
+                t5 = time.perf_counter()
+
+                print(
+                    f"capture={(t1-t0)*1000:.0f} ms | "
+                    f"vision={(t2-t1)*1000:.0f} ms | "
+                    f"geometry={(t3-t2)*1000:.1f} ms | "
+                    f"fps={(t4-t3)*1000:.0f} ms | "
+                    f"motors={(t5-t4)*1000:.0f} ms"
+                )
                     
                 # Attach FPS counter to the text and boxes
                 #cv2.putText(display_frame, f"FPS: {current_fps:.1f}", (display_frame.shape[1] - 150, 30), 

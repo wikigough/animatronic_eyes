@@ -42,6 +42,9 @@ class EyeDriver():
         # load json file
         self.json_data = self.read_json(json_file)
 
+        # store current servo state - fill with dummy values for now
+        self.servo_current_angle = [90, 90, 90, 90, 90, 90]
+
         # load current servo limits.
         self.reset_servos()
         
@@ -50,17 +53,33 @@ class EyeDriver():
 
 
     def reset_servos(self):
-        self.kit.servo[self.EYES_UP_DOWN].angle = self.json_data["eyes"][self.EYES_UP_DOWN]["mid"]
-        self.kit.servo[self.EYES_LEFT_RIGHT].angle = self.json_data["eyes"][self.EYES_LEFT_RIGHT]["mid"]
-        self.kit.servo[self.RIGHT_EYE_UPPER_LID].angle = self.json_data["eyes"][self.RIGHT_EYE_UPPER_LID]["mid"]
-        self.kit.servo[self.RIGHT_EYE_LOWER_LID].angle = self.json_data["eyes"][self.RIGHT_EYE_LOWER_LID]["mid"]
-        self.kit.servo[self.LEFT_EYE_UPPER_LID].angle = self.json_data["eyes"][self.LEFT_EYE_UPPER_LID]["mid"]
-        self.kit.servo[self.LEFT_EYE_LOWER_LID].angle = self.json_data["eyes"][self.LEFT_EYE_LOWER_LID]["mid"]
 
+        self.servo_to_angle(self.EYES_UP_DOWN, self.json_data["eyes"][self.EYES_UP_DOWN]["mid"])
+        self.servo_to_angle(self.EYES_LEFT_RIGHT, self.json_data["eyes"][self.EYES_LEFT_RIGHT]["mid"])
+        self.servo_to_angle(self.RIGHT_EYE_UPPER_LID, self.json_data["eyes"][self.RIGHT_EYE_UPPER_LID]["mid"])
+        self.servo_to_angle(self.RIGHT_EYE_LOWER_LID, self.json_data["eyes"][self.RIGHT_EYE_LOWER_LID]["mid"])
+        self.servo_to_angle(self.LEFT_EYE_UPPER_LID, self.json_data["eyes"][self.LEFT_EYE_UPPER_LID]["mid"])
+        self.servo_to_angle(self.LEFT_EYE_LOWER_LID, self.json_data["eyes"][self.LEFT_EYE_LOWER_LID]["mid"])
+
+    def move_eyes_left_right(self, angle: int):
+        self.servo_to_angle(self.EYES_LEFT_RIGHT, angle)
+
+    def move_eyes_up_down(self, angle: int):
+        self.servo_to_angle(self.EYES_UP_DOWN, angle)
+        self.servo_to_angle(self.RIGHT_EYE_UPPER_LID, angle)
+        self.servo_to_angle(self.RIGHT_EYE_LOWER_LID, angle)
+        self.servo_to_angle(self.LEFT_EYE_UPPER_LID, 180-angle)
+        self.servo_to_angle(self.LEFT_EYE_LOWER_LID, 180-angle)
+
+    
     def servo_to_angle(self, eye_id: int, angle: int):
         if 0 <= eye_id <= 5:
-            if (angle < 180) and (angle > 0):
+            if (angle <= self.json_data["eyes"][eye_id]["max"]) and (angle >= self.json_data["eyes"][eye_id]["min"]):
                 self.kit.servo[eye_id].angle = angle
+                self.servo_current_angle[eye_id] = angle
+
+    def get_current_angles(self):
+        return self.servo_current_angle
 
     def read_ina(self):
         print(f"Current: {self.ina228.current:.2f} mA")
@@ -73,33 +92,44 @@ class EyeDriver():
     def read_json(self, json_file):
         f = open(json_file, 'r')
         return json.load(f)
-        
+
+    ## TEST FUNCTIONS
     def blink(self):
         # close eyes
-        self.kit.servo[self.RIGHT_EYE_UPPER_LID].angle = self.json_data["eyes"][self.RIGHT_EYE_UPPER_LID]["min"]
-        self.kit.servo[self.RIGHT_EYE_LOWER_LID].angle = self.json_data["eyes"][self.RIGHT_EYE_LOWER_LID]["max"]
-        self.kit.servo[self.LEFT_EYE_UPPER_LID].angle = self.json_data["eyes"][self.LEFT_EYE_UPPER_LID]["max"]
-        self.kit.servo[self.LEFT_EYE_LOWER_LID].angle = self.json_data["eyes"][self.LEFT_EYE_LOWER_LID]["min"]
+        self.servo_to_angle(self.RIGHT_EYE_UPPER_LID, self.json_data["eyes"][self.RIGHT_EYE_UPPER_LID]["min"])
+        self.servo_to_angle(self.RIGHT_EYE_LOWER_LID, self.json_data["eyes"][self.RIGHT_EYE_LOWER_LID]["max"])
+        self.servo_to_angle(self.LEFT_EYE_UPPER_LID, self.json_data["eyes"][self.LEFT_EYE_UPPER_LID]["max"])
+        self.servo_to_angle(self.LEFT_EYE_LOWER_LID, self.json_data["eyes"][self.LEFT_EYE_LOWER_LID]["min"])
 
-        time.sleep(0.1)
+        time.sleep(0.15)
         # open eyes
-        self.kit.servo[self.RIGHT_EYE_UPPER_LID].angle = self.json_data["eyes"][self.RIGHT_EYE_UPPER_LID]["mid"]
-        self.kit.servo[self.RIGHT_EYE_LOWER_LID].angle = self.json_data["eyes"][self.RIGHT_EYE_LOWER_LID]["mid"]
-        self.kit.servo[self.LEFT_EYE_UPPER_LID].angle = self.json_data["eyes"][self.LEFT_EYE_UPPER_LID]["mid"]
-        self.kit.servo[self.LEFT_EYE_LOWER_LID].angle = self.json_data["eyes"][self.LEFT_EYE_LOWER_LID]["mid"]
+        self.servo_to_angle(self.RIGHT_EYE_UPPER_LID, self.json_data["eyes"][self.RIGHT_EYE_UPPER_LID]["mid"])
+        self.servo_to_angle(self.RIGHT_EYE_LOWER_LID, self.json_data["eyes"][self.RIGHT_EYE_LOWER_LID]["mid"])
+        self.servo_to_angle(self.LEFT_EYE_UPPER_LID, self.json_data["eyes"][self.LEFT_EYE_UPPER_LID]["mid"])
+        self.servo_to_angle(self.LEFT_EYE_LOWER_LID, self.json_data["eyes"][self.LEFT_EYE_LOWER_LID]["mid"])
 
     def look_right(self):
-        self.kit.servo[self.EYES_LEFT_RIGHT].angle = self.json_data["eyes"][self.EYES_LEFT_RIGHT]["min"]
+        self.servo_to_angle(self.EYES_LEFT_RIGHT, self.json_data["eyes"][self.EYES_LEFT_RIGHT]["min"])
 
     def look_left(self):
-        self.kit.servo[self.EYES_LEFT_RIGHT].angle = self.json_data["eyes"][self.EYES_LEFT_RIGHT]["max"]
+        self.servo_to_angle(self.EYES_LEFT_RIGHT, self.json_data["eyes"][self.EYES_LEFT_RIGHT]["max"])
 
     def look_up(self):
-        self.kit.servo[self.EYES_UP_DOWN].angle = self.json_data["eyes"][self.EYES_UP_DOWN]["max"]
 
+        self.servo_to_angle(self.EYES_UP_DOWN, self.json_data["eyes"][self.EYES_UP_DOWN]["max"])
+        self.servo_to_angle(self.RIGHT_EYE_UPPER_LID, self.json_data["eyes"][self.RIGHT_EYE_UPPER_LID]["max"])
+        self.servo_to_angle(self.RIGHT_EYE_LOWER_LID, self.json_data["eyes"][self.RIGHT_EYE_LOWER_LID]["max"])
+        self.servo_to_angle(self.LEFT_EYE_UPPER_LID, self.json_data["eyes"][self.LEFT_EYE_UPPER_LID]["min"])
+        self.servo_to_angle(self.LEFT_EYE_LOWER_LID, self.json_data["eyes"][self.LEFT_EYE_LOWER_LID]["min"])
+    
     def look_down(self):
-        self.kit.servo[self.EYES_UP_DOWN].angle = self.json_data["eyes"][self.EYES_UP_DOWN]["min"]
 
+        self.servo_to_angle(self.EYES_UP_DOWN, self.json_data["eyes"][self.EYES_UP_DOWN]["min"])
+        self.servo_to_angle(self.RIGHT_EYE_UPPER_LID, self.json_data["eyes"][self.RIGHT_EYE_UPPER_LID]["min"])
+        self.servo_to_angle(self.RIGHT_EYE_LOWER_LID, self.json_data["eyes"][self.RIGHT_EYE_LOWER_LID]["min"])
+        self.servo_to_angle(self.LEFT_EYE_UPPER_LID, self.json_data["eyes"][self.LEFT_EYE_UPPER_LID]["max"])
+        self.servo_to_angle(self.LEFT_EYE_LOWER_LID, self.json_data["eyes"][self.LEFT_EYE_LOWER_LID]["max"])
+            
 
 
 if __name__ == "__main__":
@@ -114,6 +144,7 @@ if __name__ == "__main__":
     print("  ll")
     print("  lu")
     print("  ld")
+    print("  angles")
 
     try:
         while True:
@@ -149,6 +180,10 @@ if __name__ == "__main__":
 
             if command  == "ld":
                 eyes.look_down()
+                continue
+
+            if command  == "angles":
+                print(eyes.get_current_angles())
                 continue
 
             try:
