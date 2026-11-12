@@ -48,10 +48,19 @@ class EyeDriver():
         # load current servo limits.
         self.reset_servos()
         
-        # calibrate servos
-        # self.
+        # define pid constants and trackers
+        self.kp = 0.3
+        self.ki = 0.05
+        self.kd = 0.0
+        self.servo_integral = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        self.servo_previous_error = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        self.servo_last_time = [None, None, None, None, None, None]
 
-
+    @staticmethod
+    def read_json(json_file):
+        f = open(json_file, 'r')
+        return json.load(f)
+    
     def reset_servos(self):
 
         self.servo_to_angle(self.EYES_UP_DOWN, self.json_data["eyes"][self.EYES_UP_DOWN]["mid"])
@@ -78,6 +87,68 @@ class EyeDriver():
                 self.kit.servo[eye_id].angle = angle
                 self.servo_current_angle[eye_id] = angle
 
+    def servo_to_angle_pid(self, eye_id: int, target_angle: int) -> bool:
+        # call this function repeatedly! 
+        # Returns true when target is reached.
+
+        # firstly check if correct eye_id has been entered
+        if 0 <= eye_id <= 5:
+
+            # make sure the target angle is bound between min and max of the eye_ids before continuing further
+            target_angle = max(self.json_data["eyes"][eye_id]["min"], min(self.json_data["eyes"][eye_id]["max"], target_angle))
+
+            # get error value
+            current_angle = self.servo_current_angle[eye_id]
+            error = target_angle - current_angle
+
+            # get time and update time tracker
+            now = time.monotonic()
+            last_time = self.servo_last_time[eye_id]
+            self.servo_last_time[eye_id] = now
+
+            # if we just started, skip the rest of the loop and return when we can calculate a dt value.
+            if last_time is None:
+                self.servo_previous_error[eye_id] = error
+                return False
+
+            # get dt - also limit unusually large time gaps from errors etc
+            dt = min(now - last_time, 0.1)
+            if dt <= 0:
+                return False
+
+
+            # Stop close to the target and clear accumulated integral.
+            if abs(error) < 0.5:
+                # reset
+                self.servo_integral[eye_id] = 0.0
+                self.servo_last_time[eye_id] = None
+                self.servo_previous_error[eye_id] = 0.0
+                return True
+
+             # Integral term with anti-windup.
+            integral = self.servo_integral[eye_id] + error * dt
+            integral = max(-30.0, min(30.0, integral))
+            self.servo_integral[eye_id] = integral
+
+            # Derivative: rate at which the error is changing.
+            previous_error = self.servo_previous_error[eye_id]
+            derivative = (error - previous_error) / dt
+            self.servo_previous_error[eye_id] = error
+
+            correction = self.kp * error + self.ki * integral +self.kd * derivative
+            print(correction)
+
+            # Limit how far the servo can move per update.
+            correction = max(-10.0, min(10.0, correction))
+            commanded_angle = current_angle + correction
+            commanded_angle = max(self.json_data["eyes"][eye_id]["min"], min(self.json_data["eyes"][eye_id]["max"], commanded_angle))
+        
+            # update current angle - this updates the current angle too. 
+            self.servo_to_angle(eye_id, commanded_angle)
+
+            return False
+
+
     def get_current_angles(self):
         return self.servo_current_angle
 
@@ -89,12 +160,29 @@ class EyeDriver():
         print(f"Energy: {self.ina228.energy:.2f} J")
         print(f"Temperature: {self.ina228.die_temperature:.2f} °C")
 
-    def read_json(self, json_file):
-        f = open(json_file, 'r')
-        return json.load(f)
+    def test_blink2(self):
+        # get the current position of the eyelids - for safekeeping
+        re_ul_open = self.servo_current_angle[self.RIGHT_EYE_UPPER_LID]
+        re_ll_open = self.servo_current_angle[self.RIGHT_EYE_LOWER_LID]
+        le_ul_open = self.servo_current_angle[self.LEFT_EYE_UPPER_LID]
+        le_ll_open = self.servo_current_angle[self.LEFT_EYE_LOWER_LID]
+
+        # closing movement commence! Note that eyes just blink to the midpoint...
+        self.servo_to_angle(self.RIGHT_EYE_UPPER_LID, self.json_data["eyes"][self.RIGHT_EYE_UPPER_LID]["min"])
+        self.servo_to_angle(self.RIGHT_EYE_LOWER_LID, self.json_data["eyes"][self.RIGHT_EYE_LOWER_LID]["max"])
+        self.servo_to_angle(self.LEFT_EYE_UPPER_LID, self.json_data["eyes"][self.LEFT_EYE_UPPER_LID]["max"])
+        self.servo_to_angle(self.LEFT_EYE_LOWER_LID, self.json_data["eyes"][self.LEFT_EYE_LOWER_LID]["min"])
+
+        time.sleep(0.15)
+
+        # opening - commence!
+        self.servo_to_angle(self.RIGHT_EYE_UPPER_LID, re_ul_open)
+        self.servo_to_angle(self.RIGHT_EYE_LOWER_LID, re_ll_open)
+        self.servo_to_angle(self.LEFT_EYE_UPPER_LID, le_ul_open)
+        self.servo_to_angle(self.LEFT_EYE_LOWER_LID, le_ll_open)
 
     ## TEST FUNCTIONS
-    def blink(self):
+    def test_blink(self):
         # close eyes
         self.servo_to_angle(self.RIGHT_EYE_UPPER_LID, self.json_data["eyes"][self.RIGHT_EYE_UPPER_LID]["min"])
         self.servo_to_angle(self.RIGHT_EYE_LOWER_LID, self.json_data["eyes"][self.RIGHT_EYE_LOWER_LID]["max"])
@@ -108,13 +196,13 @@ class EyeDriver():
         self.servo_to_angle(self.LEFT_EYE_UPPER_LID, self.json_data["eyes"][self.LEFT_EYE_UPPER_LID]["mid"])
         self.servo_to_angle(self.LEFT_EYE_LOWER_LID, self.json_data["eyes"][self.LEFT_EYE_LOWER_LID]["mid"])
 
-    def look_right(self):
+    def test_look_right(self):
         self.servo_to_angle(self.EYES_LEFT_RIGHT, self.json_data["eyes"][self.EYES_LEFT_RIGHT]["min"])
 
-    def look_left(self):
+    def test_look_left(self):
         self.servo_to_angle(self.EYES_LEFT_RIGHT, self.json_data["eyes"][self.EYES_LEFT_RIGHT]["max"])
 
-    def look_up(self):
+    def test_look_up(self):
 
         self.servo_to_angle(self.EYES_UP_DOWN, self.json_data["eyes"][self.EYES_UP_DOWN]["max"])
         self.servo_to_angle(self.RIGHT_EYE_UPPER_LID, self.json_data["eyes"][self.RIGHT_EYE_UPPER_LID]["max"])
@@ -122,7 +210,7 @@ class EyeDriver():
         self.servo_to_angle(self.LEFT_EYE_UPPER_LID, self.json_data["eyes"][self.LEFT_EYE_UPPER_LID]["min"])
         self.servo_to_angle(self.LEFT_EYE_LOWER_LID, self.json_data["eyes"][self.LEFT_EYE_LOWER_LID]["min"])
     
-    def look_down(self):
+    def test_look_down(self):
 
         self.servo_to_angle(self.EYES_UP_DOWN, self.json_data["eyes"][self.EYES_UP_DOWN]["min"])
         self.servo_to_angle(self.RIGHT_EYE_UPPER_LID, self.json_data["eyes"][self.RIGHT_EYE_UPPER_LID]["min"])
@@ -163,23 +251,23 @@ if __name__ == "__main__":
                 continue
 
             if command == "blink":
-                eyes.blink()
+                eyes.test_blink2()
                 continue
 
             if command == "lr":
-                eyes.look_right()
+                eyes.test_look_right()
                 continue
 
             if command == "ll":
-                eyes.look_left()
+                eyes.test_look_left()
                 continue
 
             if command == "lu":
-                eyes.look_up()
+                eyes.test_look_up()
                 continue
 
             if command  == "ld":
-                eyes.look_down()
+                eyes.test_look_down()
                 continue
 
             if command  == "angles":
@@ -192,7 +280,12 @@ if __name__ == "__main__":
                 eye_id = int(eye_id_text)
                 angle = int(angle_text)
 
-                eyes.servo_to_angle(eye_id, angle)
+                done = False
+                while not done:
+                    done = eyes.servo_to_angle_pid(eye_id, angle)
+                    time.sleep(0.01)
+                    
+
                 print(f"Servo {eye_id} moved to {angle} degrees")
 
             except ValueError:

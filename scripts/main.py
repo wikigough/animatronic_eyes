@@ -1,5 +1,6 @@
 import cv2
-from threading import Thread
+from threading import Thread, Event
+from queue import Queue, Empty, Full
 import face_recognition
 import numpy as np
 import pickle
@@ -26,7 +27,7 @@ class EyeMech():
         self.picam2 = Picamera2()
         self.raw_frame_width = 1920 # orig = 1920
         self.raw_frame_height = 1080 # orig = 1080
-        self.picam2.configure(self.picam2.create_preview_configuration(main={"format": 'XRGB8888', "size": (self.raw_frame_width, self.raw_frame_height)}))
+        self.picam2.configure(self.picam2.create_video_configuration(main={"format": 'XRGB8888', "size": (self.raw_frame_width, self.raw_frame_height)}))
         self.picam2.start()
 
         # initialise variables
@@ -44,6 +45,9 @@ class EyeMech():
         # init eyedriver
         self.eye_driver = EyeDriver()
 
+        self._eye_driver_worker = 
+
+
     def _process_frame(self, frame):
         # Resize the frame using cv_scaler to increase performance (less pixels processed, less time spent)
         resized_frame = cv2.resize(frame, (0, 0), fx=(1/self.cv_scaler), fy=(1/self.cv_scaler))
@@ -53,7 +57,7 @@ class EyeMech():
 
         # Find all the faces and face encodings in the current frame of video
         self.face_locations = face_recognition.face_locations(rgb_resized_frame, number_of_times_to_upsample=0, model="hog")
-        #self.face_encodings = face_recognition.face_encodings(rgb_resized_frame, self.face_locations, model='small')
+        # self.face_encodings = face_recognition.face_encodings(rgb_resized_frame, self.face_locations, model='small')
         
         self.face_names = []
         """
@@ -70,7 +74,7 @@ class EyeMech():
             self.face_names.append(name)
 
         """
-        return frame
+        return rgb_resized_frame
 
     def _get_centres(self):
         # top left origin in frame.
@@ -155,28 +159,6 @@ class EyeMech():
         return sph_coords
 
 
-    def _draw_results(self, frame):
-        # Display the results
-        for (top, right, bottom, left), name in zip(self.face_locations, self.face_names):
-            # Scale back up face locations since the frame we detected in was scaled
-            top *= self.cv_scaler
-            right *= self.cv_scaler
-            bottom *= self.cv_scaler
-            left *= self.cv_scaler
-            
-            # Draw a box around the face
-            cv2.rectangle(frame, (left, top), (right, bottom), (244, 42, 3), 3)
-            
-            # Draw a label with a name below the face
-            cv2.rectangle(frame, (left -3, top - 35), (right+3, top), (244, 42, 3), cv2.FILLED)
-            font = cv2.FONT_HERSHEY_DUPLEX
-            cv2.putText(frame, name, (left + 6, top - 6), font, 1.0, (255, 255, 255), 1)
-        
-        return frame
-
-    def _get_radial_coordinates(self, face_centre):
-        pass
-
     def _calculate_fps(self):
         self.frame_count += 1
         elapsed_time = time.time() - self.start_time
@@ -196,8 +178,12 @@ class EyeMech():
 
                 t1 = time.perf_counter()
                 processed_frame = self._process_frame(frame)
-                # print(self.face_locations)
-                # print(self.face_encodings)
+
+                # push processed frame to face recognition if worker ready
+                if self.recognition_ready.full():
+                    self.recognition_ready.get()
+
+
                 # print(self.face_names)
                 t2 = time.perf_counter()
 
@@ -219,7 +205,8 @@ class EyeMech():
                     r, theta, phi = sph_coords[0]
                     self.eye_driver.move_eyes_left_right(180 - (theta + 90) )
                     curr_up_down_angle = self.eye_driver.get_current_angles()[EyeDriver.EYES_UP_DOWN]
-                    self.eye_driver.move_eyes_up_down(curr_up_down_angle + phi)
+                    if abs(phi) > 10:
+                        self.eye_driver.move_eyes_up_down(curr_up_down_angle + phi)
 
                 t5 = time.perf_counter()
 
@@ -231,19 +218,9 @@ class EyeMech():
                     f"motors={(t5-t4)*1000:.0f} ms"
                 )
                     
-                # Attach FPS counter to the text and boxes
-                #cv2.putText(display_frame, f"FPS: {current_fps:.1f}", (display_frame.shape[1] - 150, 30), 
-                #            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                    
-                # Display everything over the video feed.
-                #cv2.imshow('Video', display_frame)
-                    
-                # Break the loop and stop the script if 'q' is pressed
-                #if cv2.waitKey(1) == ord("q"):
-                #    break
         except KeyboardInterrupt:
-            # By breaking the loop we run this code here which closes everything
             self.picam2.stop()
+
 
 if __name__ == "__main__":
     eyemech = EyeMech()
