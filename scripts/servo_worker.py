@@ -2,6 +2,7 @@ from eye_driver import EyeDriver
 import multiprocessing
 from queue import Empty, Full
 import time
+from system_states import EyelidState
 
 # define blink time bits
 BLINK_TIME_THRESHOLD = 6.0 # seconds
@@ -9,38 +10,49 @@ BLINK_LENGTH = 0.2 # seconds
 blink_time_tracker = time.monotonic()
 blink_state = False
 
+OPEN_LID_TIMEOUT = 20.0 # seconds
+eyes_open_time_tracker = time.monotonic()
+
 # other states - wide or squint - TODO
 # wide_state = False
 # squint_state = False
 
 
-def _servo_eyelid_positions(eye_driver, ud):
-    global blink_state, blink_time_tracker
+def _servo_eyelid_positions(eye_driver, ud, face_detected_bool):
+    global blink_state, blink_time_tracker, eyes_open_time_tracker
+    
     # default values for the eyelids.
     re_ul, re_ll, le_ul, le_ll = eye_driver.get_eyelid_angles_from_up_down(ud)
 
-    # check if it's blink time and ovewrite default values if necessary
-    if not blink_state:
-        if (time.monotonic() - blink_time_tracker > BLINK_TIME_THRESHOLD):
-            # yes it is - reset time tracker - kick off blinking
-            blink_time_tracker = time.monotonic()
-            blink_state = True
+    if face_detected_bool:
+        # reset eyes_open_time_tracker
+        eyes_open_time_tracker = time.monotonic()
 
-    if blink_state:
-        
-        if (time.monotonic() - blink_time_tracker > BLINK_LENGTH):
-            # yes it is - reset time tracker - kick off blinking
-            blink_time_tracker = time.monotonic()
-            blink_state = False
-        else:
-            # get blink desired angles - mid
-            print("blinking and getting midpoints")
-            re_ul, re_ll, le_ul, le_ll = eye_driver.get_eyelid_closed_angles()
+    if (time.monotonic() - eyes_open_time_tracker) <= OPEN_LID_TIMEOUT:
+
+        # check if it's blink time and ovewrite default values if necessary
+        if not blink_state:
+            if (time.monotonic() - blink_time_tracker > BLINK_TIME_THRESHOLD):
+                # yes it is - reset time tracker - kick off blinking
+                blink_time_tracker = time.monotonic()
+                blink_state = True
+
+        if blink_state:
+            
+            if (time.monotonic() - blink_time_tracker > BLINK_LENGTH):
+                # yes it is - reset time tracker - kick off blinking
+                blink_time_tracker = time.monotonic()
+                blink_state = False
+            else:
+                # get blink desired angles
+                re_ul, re_ll, le_ul, le_ll = eye_driver.get_eyelid_closed_angles()
+    else:
+        re_ul, re_ll, le_ul, le_ll = eye_driver.get_eyelid_closed_angles()
 
     return re_ul, re_ll, le_ul, le_ll
 
 
-def servo_worker(current_angles, desired_angles, stop_event):
+def servo_worker(current_angles, desired_angles, face_detected, stop_event):
     try:
         # define the EyeDriver class
         '''
@@ -75,7 +87,7 @@ def servo_worker(current_angles, desired_angles, stop_event):
                 ud, lr = desired_angles[:]
 
             # get eyelid positions
-            re_ul, re_ll, le_ul, le_ll = _servo_eyelid_positions(eye_driver, ud)
+            re_ul, re_ll, le_ul, le_ll = _servo_eyelid_positions(eye_driver, ud, face_detected.is_set())
 
             # update desired angles
             eye_driver.update_desired_angles([ud, lr, re_ul, re_ll, le_ul, le_ll])

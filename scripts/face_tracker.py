@@ -165,7 +165,7 @@ class FaceTracker():
             lr = 180 - (theta + 90)
             ud = ud_curr + phi
 
-        return ud, lr
+        return ud, lr, processed_frame, sph_coords
 
 
 if __name__ == "__main__":

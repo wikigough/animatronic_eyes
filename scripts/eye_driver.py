@@ -176,7 +176,6 @@ class EyeDriver():
             return False
 
     def all_servos_to_desired_angles(self):
-        # TODO: add timeout
 
         done_ud    = self.servo_to_angle_pid(self.EYES_UP_DOWN, self.servo_desired_angle[self.EYES_UP_DOWN])
         done_lr    = self.servo_to_angle_pid(self.EYES_LEFT_RIGHT, self.servo_desired_angle[self.EYES_LEFT_RIGHT])

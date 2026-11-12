@@ -31,7 +31,8 @@ class EyeBalls():
         """
         self.desired_angles = self.ctx.Array("d", [90.0, 90.0], lock=True) # [up_down, left_right]
         self.current_angles = self.ctx.Array("d", [90.0, 90.0], lock=True) # [up_down, left_right] - no need for eyelids.
-        self.eyelid_state = self.ctx.Queue(maxsize=1)
+        self.face_detected = self.ctx.Event() # for telling various processes that there has been a face detected
+        self.face_detected.clear()
 
         # define queues for recognition
         self.recognition_requests = self.ctx.Queue(maxsize=1)
@@ -39,12 +40,12 @@ class EyeBalls():
 
         self.servo = self.ctx.Process(
             target=servo_worker,
-            args=(self.current_angles, self.desired_angles, self.stop_event),
+            args=(self.current_angles, self.desired_angles, self.face_detected, self.stop_event),
         )
 
         self.tracker = self.ctx.Process(
             target=tracker_worker,
-            args=(self.current_angles, self.desired_angles, self.recognition_requests, self.recognition_results, self.stop_event),
+            args=(self.current_angles, self.desired_angles, self.recognition_requests, self.recognition_results, self.face_detected, self.stop_event),
         )
 
         self.recognizer = self.ctx.Process(
@@ -54,10 +55,10 @@ class EyeBalls():
 
     def run(self):
         try: 
+            print("initalising all the workers...")
             self.servo.start()
             self.tracker.start()
             self.recognizer.start()
-
             while not self.stop_event.is_set():
                 pass
 

@@ -5,3 +5,4 @@ class EyelidState(IntEnum):
     BLINK = 1
     WIDE = 2
     SQUINT = 3
+    CLOSED = 4
