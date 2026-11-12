@@ -1,6 +1,8 @@
 # animatronic_eyes
 Code to run animatronic eyes with the RPi. 
 
+This is still a work in progress!
+
 # Setup
 ## Configure I2C
 Configure your Pi with I2C:
@@ -52,3 +54,12 @@ Resolve-DnsName eyepi.local
 ./grab_images.sh vicky eyepi.local /home/vicky/projects/eyes
 ```
 ## Running
+Navigate to /home/vicky/projects/eyes/scripts.
+Ensure environment is activated. 
+Run:
+```bash
+python main.py
+```
+
+# Design 
+![plot](system_diagram.png)
