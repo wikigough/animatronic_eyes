@@ -42,6 +42,7 @@ def tracker_worker(current_angles, desired_angles, recognition_requests, recogni
 
             # if faces found, open eyes, otherwise close
             if sph_coords:
+                print("Face detected!")
                 face_detected.set()
             else:
                 face_detected.clear()

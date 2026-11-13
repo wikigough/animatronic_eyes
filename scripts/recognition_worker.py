@@ -24,7 +24,6 @@ def recognition_worker(recognition_requests, recognition_results, stop_event):
             except Empty:
                 continue
 
-            print("Got data!")
             # Find all the faces and face encodings in the frame of video that has been sent through
             face_locations = face_recognition.face_locations(processed_frame, number_of_times_to_upsample=0, model="hog")
             face_encodings = face_recognition.face_encodings(processed_frame, face_locations, model='small')
