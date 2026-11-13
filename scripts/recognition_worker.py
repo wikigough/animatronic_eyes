@@ -45,7 +45,7 @@ def recognition_worker(recognition_requests, recognition_results, stop_event):
 
             # dump names into the queue - put a timeout in there so that is not blocking. 
             try: 
-                recognition_results.put(face_names, timeout=0.1)
+                recognition_results.put(face_names, timeout=1.0)
             except Full:
                 # just discard - running ahead of tracker
                 pass

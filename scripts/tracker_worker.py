@@ -26,12 +26,13 @@ def tracker_worker(current_angles, desired_angles, recognition_requests, recogni
             # now input this into per frame processing
             ud_desired, lr_desired, processed_frame, sph_coords = ft.run_single_track(ud_curr, lr_curr)
 
-            # push to desired coordinates
-            with desired_angles.get_lock():
-                desired_angles[0] = ud_desired
-                desired_angles[1] = lr_desired
+            # if face is found, push to desired coordinates
+            if sph_coords:
+                with desired_angles.get_lock():
+                    desired_angles[0] = ud_desired
+                    desired_angles[1] = lr_desired
 
-            # initiate request for recognition
+            # if face is found, initiate request for recognition
             if sph_coords:
                 try:
                     recognition_requests.put_nowait(processed_frame)

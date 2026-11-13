@@ -90,7 +90,6 @@ class FaceTracker():#
         # Find all the faces in the current frame of video
         # self.face_locations = face_recognition.face_locations(rgb_resized_frame, number_of_times_to_upsample=0, model="hog")
 
-        t0 = time.monotonic()
         # Find all the faces - using FaceDetectorYN as a test - dont return just yet
         _, faces = self.yn_detector.detect(rgb_resized_frame)
 
@@ -99,16 +98,12 @@ class FaceTracker():#
         if faces is not None:
             for face in faces:
                 # convert: [left, top, right-left, bottom-top] ->  (top, right, bottom, left)  # Bounding box
-                left = face[0]
-                top = face[1]
-                right = face[2] + face[0]
-                bottom = face [3] + face[1]
+                left = round(face[0])
+                top = round(face[1])
+                right = round(face[2] + face[0])
+                bottom = round(face [3] + face[1])
                 self.face_locations.append( (top, right, bottom, left) )
-                print((top, right, bottom, left, face[14]))
-
-        t1 = time.monotonic()
-
-        # print(f"face_detector_yn={(t1-t0)*1000:.0f} ms")
+                #print((top, right, bottom, left, face[14]))
 
         return rgb_resized_frame
 

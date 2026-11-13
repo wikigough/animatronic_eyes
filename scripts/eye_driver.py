@@ -62,12 +62,17 @@ class EyeDriver():
         return json.load(f)
     
     def reset_servos(self):
-
+        # this is staggered in time to limit the inrush. only use this in non time-critical tasks
         self.servo_to_angle(self.EYES_UP_DOWN, self.json_data["eyes"][self.EYES_UP_DOWN]["mid"])
+        time.sleep(0.1)
         self.servo_to_angle(self.EYES_LEFT_RIGHT, self.json_data["eyes"][self.EYES_LEFT_RIGHT]["mid"])
+        time.sleep(0.1)
         self.servo_to_angle(self.RIGHT_EYE_UPPER_LID, self.json_data["eyes"][self.RIGHT_EYE_UPPER_LID]["mid"])
+        time.sleep(0.1)
         self.servo_to_angle(self.RIGHT_EYE_LOWER_LID, self.json_data["eyes"][self.RIGHT_EYE_LOWER_LID]["mid"])
+        time.sleep(0.1)
         self.servo_to_angle(self.LEFT_EYE_UPPER_LID, self.json_data["eyes"][self.LEFT_EYE_UPPER_LID]["mid"])
+        time.sleep(0.1)
         self.servo_to_angle(self.LEFT_EYE_LOWER_LID, self.json_data["eyes"][self.LEFT_EYE_LOWER_LID]["mid"])
 
     def get_min_angle(self, eye_id):
