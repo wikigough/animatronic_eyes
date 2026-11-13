@@ -62,4 +62,13 @@ python main.py
 ```
 
 # Design 
+## Face detection model
+Using from `face_detection_yunet_2023mar.onnx` from https://huggingface.co/opencv/opencv_zoo/blob/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx
+
+Note this requires downloading the `.onnx` file and placing it on the Pi.
+
+## Face recogition
+Using face_recognition library for this. 
+
+## System diagram
 ![plot](system_diagram.png)

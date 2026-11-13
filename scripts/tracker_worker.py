@@ -58,10 +58,13 @@ def tracker_worker(current_angles, desired_angles, recognition_requests, recogni
 
     except Exception as e: 
         print(e) 
+        if ft is not None:
+            ft.picam2.stop()
         stop_event.set()
         raise
             
 
     finally:
         print("Tracker worker closing.")
-        ft.picam2.stop()
+        if ft is not None:
+            ft.picam2.stop()

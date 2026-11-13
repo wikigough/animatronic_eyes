@@ -9,7 +9,44 @@ import math
 
 from picamera2 import Picamera2
 
-class FaceTracker():
+class FaceTracker():#
+    '''
+        top left origin in frame.
+        (top, right, bottom, left)
+         
+        (0,0)
+         
+         +------------------------------+  → x
+         |   +---top----+               |
+         |   |          |               |
+         |  left        right           |
+         |   |          |               |
+         |   +--bottom--+               |
+         |                              |
+         +------------------------------+
+         
+         ↓ y
+
+        note output of face_recognition: 
+            faces = face_recognition.face_locations(..)
+            faces = [ (face_bounding_box0), (face_bounding_box1), (face_bounding_box2) ...]
+            faces[n] = (top, right, bottom, left)
+        
+        output of yn detector:
+            _, faces = self.yn_detector.detect(rgb_resized_frame)
+            faces = [ [face0_data], [face1_data], ...]
+            faces[n] = [
+                left, top, right-left, bottom-top,   # Bounding box
+                x, y,                                # Right eye centre
+                x, y,                                # Left eye centre
+                x, y,                                # Nose
+                x, y,                                # Right mouth corner
+                x, y,                                # Left mouth corner
+                fraction                             # Confidence
+            ]
+
+
+    '''
     def __init__(self):
 
         # init camera
@@ -20,7 +57,7 @@ class FaceTracker():
         self.picam2.start()
 
         # initialise variables
-        self.cv_scaler = 2
+        self.cv_scaler = 2 # default = 2
         self.face_location_x_max = int(self.raw_frame_width / self.cv_scaler)
         self.face_location_y_max = int(self.raw_frame_height / self.cv_scaler)
         self.face_locations = []
@@ -31,17 +68,48 @@ class FaceTracker():
         self.fps = 0
         self.fov = math.pi * 120/180
 
+        # test only - YuNet
+        SCRIPT_PATH = Path(__file__).resolve().parent
+        MODEL_PATH = SCRIPT_PATH.parent / "tools" /  "face_detection_yunet_2023mar.onnx"
+        self.yn_detector = cv2.FaceDetectorYN.create(
+            str(MODEL_PATH),
+            "",
+            (int(self.raw_frame_width / self.cv_scaler), int(self.raw_frame_height / self.cv_scaler)),
+            score_threshold=0.65, # default = 65
+            nms_threshold=0.3,
+            top_k=500,
+        )
 
     def _process_frame(self, frame):
         # Resize the frame using cv_scaler to increase performance (less pixels processed, less time spent)
         resized_frame = cv2.resize(frame, (0, 0), fx=(1/self.cv_scaler), fy=(1/self.cv_scaler))
-        
+
         # Convert the image from BGR to RGB colour space, the facial recognition library uses RGB, OpenCV uses BGR
         rgb_resized_frame = cv2.cvtColor(resized_frame, cv2.COLOR_BGR2RGB)
 
         # Find all the faces in the current frame of video
-        self.face_locations = face_recognition.face_locations(rgb_resized_frame, number_of_times_to_upsample=0, model="hog")
-        
+        # self.face_locations = face_recognition.face_locations(rgb_resized_frame, number_of_times_to_upsample=0, model="hog")
+
+        t0 = time.monotonic()
+        # Find all the faces - using FaceDetectorYN as a test - dont return just yet
+        _, faces = self.yn_detector.detect(rgb_resized_frame)
+
+        # convert to face_recognition.face_locations() friendly output, as rest of code was written given this
+        self.face_locations = []
+        if faces is not None:
+            for face in faces:
+                # convert: [left, top, right-left, bottom-top] ->  (top, right, bottom, left)  # Bounding box
+                left = face[0]
+                top = face[1]
+                right = face[2] + face[0]
+                bottom = face [3] + face[1]
+                self.face_locations.append( (top, right, bottom, left) )
+                print((top, right, bottom, left, face[14]))
+
+        t1 = time.monotonic()
+
+        # print(f"face_detector_yn={(t1-t0)*1000:.0f} ms")
+
         return rgb_resized_frame
 
     def _get_centres(self):
