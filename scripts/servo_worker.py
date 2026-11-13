@@ -53,6 +53,9 @@ def _servo_eyelid_positions(eye_driver, ud, face_detected_bool):
 
 
 def servo_worker(current_angles, desired_angles, face_detected, stop_event):
+    
+    eye_driver = None
+
     try:
         # define the EyeDriver class
         '''
@@ -99,7 +102,10 @@ def servo_worker(current_angles, desired_angles, face_detected, stop_event):
             time.sleep(0.02)
 
     except Exception as e: 
-            print(e) 
+        print(e) 
+        stop_event.set()
+        raise
+
 
     finally: 
         eye_driver.reset_servos()

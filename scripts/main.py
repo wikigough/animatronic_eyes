@@ -59,8 +59,17 @@ class EyeBalls():
             self.servo.start()
             self.tracker.start()
             self.recognizer.start()
+
             while not self.stop_event.is_set():
-                pass
+                try:
+                    command = input("Type 'quit' to stop whenever you're ready. \n ").strip().lower()
+                except EOFError:
+                    return
+
+                if command in {"q", "quit", "exit"}:
+                    print("Shutdown requested. Stopping eyeballs.")
+                    self.stop_event.set()
+                    return
 
         except KeyboardInterrupt:
             print("Stopping eyeballs.")

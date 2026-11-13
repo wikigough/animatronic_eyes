@@ -30,7 +30,7 @@
             "Name": "RIGHT_EYE_LOWER_LID", 
             "min": 50,
             "mid": 90,
-            "max": 140 
+            "max": 155 
         
         },
         {
@@ -44,7 +44,7 @@
         {
             "id": 5,
             "Name": "LEFT_EYE_LOWER_LID", 
-            "min": 40,
+            "min": 35,
             "mid": 90,
             "max": 130 
         

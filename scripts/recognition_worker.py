@@ -7,7 +7,8 @@ from queue import Empty, Full
 def recognition_worker(recognition_requests, recognition_results, stop_event):
     try:
         # load facial recognition data
-        ENCODINGS_PICKLE_PATH = Path("..") / "face_recognition" / "encodings.pickle"
+        SCRIPT_DIR = Path(__file__).resolve().parent
+        ENCODINGS_PICKLE_PATH =  SCRIPT_DIR.parent / "face_recognition" / "encodings.pickle"
         with open(ENCODINGS_PICKLE_PATH, "rb") as f:
             data = pickle.loads(f.read())
 
@@ -42,8 +43,17 @@ def recognition_worker(recognition_requests, recognition_results, stop_event):
                     name = known_face_names[best_match_index]
                 face_names.append(name)
 
-            # dump names into the queue
-            recognition_results.put(face_names)
+            # dump names into the queue - put a timeout in there so that is not blocking. 
+            try: 
+                recognition_results.put(face_names, timeout=0.1)
+            except Full:
+                # just discard - running ahead of tracker
+                pass
+
+    except Exception as e:  
+        print(e) 
+        stop_event.set()
+        raise
     
     finally:
         print("Recognition worker closing.")

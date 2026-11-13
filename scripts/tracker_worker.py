@@ -6,6 +6,9 @@ from system_states import EyelidState
 
 
 def tracker_worker(current_angles, desired_angles, recognition_requests, recognition_results, face_detected, stop_event):
+
+    ft = None
+    
     try:
 
         # init ft
@@ -18,7 +21,7 @@ def tracker_worker(current_angles, desired_angles, recognition_requests, recogni
 
             # get current positions
             with current_angles.get_lock():
-                ud_curr, lr_curr = desired_angles[:]
+                ud_curr, lr_curr = current_angles[:]
 
             # now input this into per frame processing
             ud_desired, lr_desired, processed_frame, sph_coords = ft.run_single_track(ud_curr, lr_curr)
@@ -43,13 +46,20 @@ def tracker_worker(current_angles, desired_angles, recognition_requests, recogni
                 face_detected.clear()
             
             # check recognition results
-            if not recognition_results.empty():
-                face_names = recognition_results.get()
-                for face_name in face_names:
-                    print("Hello ", face_name, "!")
+            face_names = []
+            try: 
+                face_names = recognition_results.get_nowait()
+            except Empty:
+                pass
+
+            # do something with recognition results
+            for face_name in face_names:
+                print("Hello ", face_name, "!")
 
     except Exception as e: 
-        print(e)
+        print(e) 
+        stop_event.set()
+        raise
             
 
     finally:
